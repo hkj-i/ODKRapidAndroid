@@ -483,7 +483,9 @@ public class InstanceUploaderTask extends AsyncTask<Long, Integer, InstanceUploa
 				stringArgs, 
 				null); 
 		Log.i("InstanceUploaderTask: ", "searched for message row");
-		if (messageRow != null) {
+		messageRow.moveToFirst();
+		Log.i("is_sent index", messageRow.getColumnIndex("is_sent") + "");
+		if (messageRow != null && messageRow.getColumnIndex("is_sent") != -1) {
 			// change the sent value
 			Log.i("InstanceUploaderTask: ", "changing issent");
 			ContentResolver rapidResolver = Collect.getInstance().getApplicationContext().getContentResolver();

@@ -148,7 +148,9 @@ public class UpdateRapidAndroidDBTask {
 					null);
 			Log.i("update ra", "form uri = " + instance_id);
 			messageRows.moveToFirst();
-			if (messageRows != null || messageRows.getColumnCount() > 0) {
+			Log.i("update - status index", messageRows.getColumnIndex("status") + "");
+			if ( messageRows.getColumnIndex("status") != -1 &&
+					messageRows != null && messageRows.getColumnCount() > 0) {
 				// update the finalized column if there was a change
 				if (status.equals("complete")) {
 					Log.i("status", "complete");
@@ -162,6 +164,7 @@ public class UpdateRapidAndroidDBTask {
 				    		 null);
 					Log.i("is_finalized", "updated to true");
 				}
+				
 				String messageid = messageRows.getString(messageRows.getColumnIndex("_id"));
 				// if the message is found, then try to update the fields
 				String[] stringArgs = {formname};
