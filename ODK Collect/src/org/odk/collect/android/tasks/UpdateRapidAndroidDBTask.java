@@ -20,6 +20,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -40,9 +41,12 @@ public class UpdateRapidAndroidDBTask {
     private static final String RAPIDANDROID_FIELDTYPE =   RAPIDANDROID + "fieldtype";
     private static final String RAPIDANDROID_FORM =  RAPIDANDROID + "form";
     private static final String RAPIDANDROID_FORMDATA =  RAPIDANDROID + "formdata/";
+    private static final int RAPIDANDROID_MULTIPLECHOICE = 2;
     
-
-	
+    /**
+     * Constructor for RapidAndroid
+     * @param uri
+     */
 	public UpdateRapidAndroidDBTask(Uri uri) {
 		mUri = uri;
 		if (Collect.getInstance().getContentResolver().getType(mUri) == InstanceColumns.CONTENT_ITEM_TYPE) {
@@ -59,6 +63,11 @@ public class UpdateRapidAndroidDBTask {
 	 * updates rapid android database
 	 */
 	
+	/**
+	 * Takes a file path and generates a string cotaining the file contents
+	 * @param filepath
+	 * @return true if it successfully made a string, false if not
+	 */
 	private boolean getXML(String filepath) {
 		try {
 			// get xml string from file
@@ -77,6 +86,10 @@ public class UpdateRapidAndroidDBTask {
 		}
 	}
 
+	/**
+	 * Tries to create a DOM structure used for reading xml
+	 * @return true if it succeeds, false if it failed
+	 */
 	private boolean createDOM() {
 		Document doc = null;
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -96,6 +109,10 @@ public class UpdateRapidAndroidDBTask {
         return false;
 	}
 	
+	/**
+	 * Used for Updating RapidAndroid's database by updating the columns of messages to which the instance_file belongs
+	 * Updates the is_finalized field
+	 */
 	public void update() {
 		if (shouldParse) {
 			Context context = Collect.getInstance();
@@ -113,6 +130,7 @@ public class UpdateRapidAndroidDBTask {
 			instanceRows.moveToFirst();
 			String formname = instanceRows.getString(instanceRows.getColumnIndex("jrFormName"));
 			String filepath = instanceRows.getString(instanceRows.getColumnIndex("instanceFilePath"));
+			String status = instanceRows.getString(instanceRows.getColumnIndex("status"));
 			
 			Log.i("Update Rapid Android DB", "formname is " + formname);
 			
@@ -128,9 +146,22 @@ public class UpdateRapidAndroidDBTask {
 					"form_uri = " + instance_id,
 					null,
 					null);
-			
+			Log.i("update ra", "form uri = " + instance_id);
 			messageRows.moveToFirst();
 			if (messageRows != null || messageRows.getColumnCount() > 0) {
+				// update the finalized column if there was a change
+				if (status.equals("complete")) {
+					Log.i("status", "complete");
+					// finalized column says complete
+					// make sure it is in rapidandroid db
+					ContentValues rapidValue = new ContentValues();
+					rapidValue.put("is_finalized", 1);
+					context.getContentResolver().update(Uri.parse(RAPIDANDROID_MESSAGE),
+				    		 rapidValue,
+				    		 "form_uri = " + instance_id,
+				    		 null);
+					Log.i("is_finalized", "updated to true");
+				}
 				String messageid = messageRows.getString(messageRows.getColumnIndex("_id"));
 				// if the message is found, then try to update the fields
 				String[] stringArgs = {formname};
@@ -152,7 +183,7 @@ public class UpdateRapidAndroidDBTask {
 						"message_id = " + messageid,
 						null,
 						null);
-				
+				Log.i("update ra", "message id = "+ messageid);
 				// get the column names
 				parsedDataRow.moveToFirst();
 				String[] columnNames = parsedDataRow.getColumnNames();
@@ -188,9 +219,16 @@ public class UpdateRapidAndroidDBTask {
 									"_id = " + ftype_id,
 									null,
 									null);
+							Cursor questionType = context.getContentResolver().query(Uri.parse(RAPIDANDROID_FORM), 
+									null,
+									"_id = " + formid,  
+									null, 
+									null);
 
 							datatyperow.moveToFirst();
-
+							questionType.moveToFirst();
+							
+							boolean multipleChoice = false;
 							// according to the type, choose num or select or text
 							String type =  datatyperow.getString(datatyperow.getColumnIndex("datatype"));
 							String nodelabel = "";
@@ -201,8 +239,14 @@ public class UpdateRapidAndroidDBTask {
 								// yes no
 								nodelabel = "select" + select;
 								select++;
+							} else if (questionType.getInt(questionType.getColumnIndex("question_type")) == RAPIDANDROID_MULTIPLECHOICE){
+								// w
+								// multiple choice
+								multipleChoice = true;
+								nodelabel = "select" + select;
+								select++;
 							} else {
-								// number
+								// rating/ number
 								nodelabel = "num" + num;
 								num++;
 							}
@@ -221,6 +265,7 @@ public class UpdateRapidAndroidDBTask {
 										rapidValues,
 							    		 "message_id = " + messageid,
 							    		 null);
+								Log.i("update ra", "updated value into ra database: "+ columnNames[i] + " " + value);
 							} // if value.equals
 							
 						} // it is a valid column to be updated
@@ -235,6 +280,11 @@ public class UpdateRapidAndroidDBTask {
 		// not inserted via sms
 	}
 	
+	/**
+	 * Returns the string representation of the element in a specific tag
+	 * @param elem the Node
+	 * @return the value belonging to that node
+	 */
 	private String getElementValue(Node elem) {
 		Node child;
         if( elem != null){
